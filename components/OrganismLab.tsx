@@ -1,17 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Search, FlaskConical, Dna, Loader2, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
-import { getMediaRecipe, getGenomeInfo } from '../services/gemini.ts';
-import { MediaRecipe, GenomeInfo } from '../types.ts';
+import React, { useState } from 'react';
+import { Search, FlaskConical, Dna, Loader2, AlertCircle, CheckCircle2, ArrowRight } from './Icons';
+import { getMediaRecipe, getGenomeInfo } from '../services/gemini';
 
-const OrganismLab: React.FC = () => {
+const OrganismLab = () => {
   const [organism, setOrganism] = useState('');
-  const [volume, setVolume] = useState<number>(1.0);
+  const [volume, setVolume] = useState(1.0);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const [recipe, setRecipe] = useState<MediaRecipe | null>(null);
-  const [genome, setGenome] = useState<GenomeInfo | null>(null);
+  const [recipe, setRecipe] = useState<any>(null);
+  const [genome, setGenome] = useState<any>(null);
 
   const handleSearch = async () => {
     if (!organism.trim()) return;
@@ -28,7 +27,7 @@ const OrganismLab: React.FC = () => {
       ]);
       setRecipe(recipeData);
       setGenome(genomeData);
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setError("Failed to retrieve organism data. Please try again.");
     } finally {
@@ -123,7 +122,7 @@ const OrganismLab: React.FC = () => {
                 <div className="space-y-4">
                   <h5 className="font-semibold text-slate-800 border-b pb-2">Ingredients</h5>
                   <ul className="space-y-3">
-                    {recipe.ingredients.map((ing, idx) => (
+                    {recipe.ingredients.map((ing: any, idx: number) => (
                       <li key={idx} className="flex justify-between items-center text-slate-700 text-sm">
                         <span>{ing.name}</span>
                         <span className="font-mono font-medium bg-slate-100 px-2 py-1 rounded text-slate-900">
@@ -137,7 +136,7 @@ const OrganismLab: React.FC = () => {
                 <div className="mt-6 pt-6 border-t border-slate-100">
                   <h5 className="font-semibold text-slate-800 mb-2">Instructions</h5>
                   <ol className="list-decimal list-inside space-y-2 text-sm text-slate-600">
-                    {recipe.instructions.map((inst, idx) => (
+                    {recipe.instructions.map((inst: string, idx: number) => (
                       <li key={idx}>{inst}</li>
                     ))}
                   </ol>
