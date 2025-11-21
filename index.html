@@ -121,15 +121,17 @@
               "summary": "string (Brief 2-sentence summary of the genome significance)",
               "genomeSize": "string (e.g. 4.6 Mb, 12 Mb)",
               "isAvailable": boolean (True if widely available on NCBI),
-              "ncbiSearchTerm": "string (Optimized search term for NCBI)"
+              "ncbiSearchTerm": "string (The EXACT full scientific name to use in NCBI search. Example: 'Saccharomyces cerevisiae' NOT 'Yeast'. Example: 'Escherichia coli' NOT 'E. coli')"
             }
           `;
           const data = await GeminiService.generate(prompt, true);
           
           // Construct link locally to ensure validity
+          // Using the general genome landing page with the specific term
+          const searchTerm = data.ncbiSearchTerm || data.organismName || organism;
           return {
             ...data,
-            ncbiLink: `https://www.ncbi.nlm.nih.gov/genome/?term=${encodeURIComponent(data.ncbiSearchTerm || organism)}`
+            ncbiLink: `https://www.ncbi.nlm.nih.gov/genome/?term=${encodeURIComponent(searchTerm)}`
           };
         }
       };
