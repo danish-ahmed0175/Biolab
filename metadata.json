@@ -1,0 +1,7 @@
+{
+  "name": "BioLab & Vision Assistant",
+  "description": "A laboratory assistant app that calculates growth media recipes, checks NCBI genome availability, and uses AI to edit lab images.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
