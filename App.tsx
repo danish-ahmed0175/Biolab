@@ -1,6 +1,7 @@
-import React from 'react';
-import OrganismLab from './components/OrganismLab';
-import { FlaskConical, Zap } from './components/Icons';
+// @ts-nocheck
+const React = window.React;
+const OrganismLab = window.OrganismLab;
+const { FlaskConical, Zap } = window.Icons;
 
 const App = () => {
   return (
@@ -38,4 +39,4 @@ const App = () => {
   );
 };
 
-export default App;
+window.App = App;

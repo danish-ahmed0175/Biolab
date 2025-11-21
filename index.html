@@ -12,11 +12,11 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React & ReactDOM (UMD for static no-build usage) -->
+    <!-- React & ReactDOM (UMD) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- Babel for in-browser compilation -->
+    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -27,13 +27,10 @@
         overscroll-behavior-y: none; 
       }
     </style>
-  <script type="importmap">
+<script type="importmap">
 {
   "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
+    "react/": "https://aistudiocdn.com/react@^19.2.0/"
   }
 }
 </script>
@@ -41,17 +38,21 @@
   <body>
     <div id="root"></div>
     
-    <!-- Application Scripts Loaded Sequentially -->
-    <!-- Note: These are loaded as text/babel so Babel can transpile the JSX/TS syntax on the fly -->
+    <!-- 
+      CRITICAL FOR NETLIFY DRAG-N-DROP: 
+      Scripts are loaded sequentially. 
+      Components assign themselves to 'window' (Globals) instead of using 'export'.
+    -->
     
-    <!-- 1. Utilities & Services -->
+    <!-- 1. Global Definitions -->
+    <script type="text/babel" src="/types.ts"></script>
     <script type="text/babel" src="/components/Icons.tsx"></script>
     <script type="text/babel" src="/services/gemini.ts"></script>
     
     <!-- 2. Components -->
     <script type="text/babel" src="/components/OrganismLab.tsx"></script>
     
-    <!-- 3. App & Entry -->
+    <!-- 3. App Entry -->
     <script type="text/babel" src="/App.tsx"></script>
     <script type="text/babel" src="/index.tsx"></script>
   </body>
