@@ -43,7 +43,7 @@
     <div id="root"></div>
     
     <script type="text/babel">
-      const { useState, useEffect, useRef, useMemo } = React;
+      const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
       // ==========================================
       // 1. ICONS
@@ -65,6 +65,7 @@
       const Plus = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
       const Trash = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></Icon>;
       const Clipboard = (p) => <Icon {...p}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></Icon>;
+      const Download = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Icon>;
 
       // ==========================================
       // 2. SERVICES
@@ -331,78 +332,122 @@
         )
       };
 
-      // --- Feature: OD Graph ---
+      // --- Feature: OD Graph (Updated) ---
       const ODGraph = () => {
-        // Sample initial data
-        const [points, setPoints] = useState([
-          { t: 0, od: 0.05 },
-          { t: 1, od: 0.12 },
-          { t: 2, od: 0.35 },
-          { t: 3, od: 0.85 },
-          { t: 4, od: 1.40 },
-          { t: 5, od: 1.80 }
+        // Raw Data: List of all points. We group by time later.
+        const [rawData, setRawData] = useState([
+          { t: 0, od: 0.0962, rep: 'A' }, { t: 0, od: 0.09675, rep: 'B' }, { t: 0, od: 0.0959, rep: 'C' },
+          { t: 24, od: 0.1535, rep: 'A' }, { t: 24, od: 0.1164, rep: 'B' }, { t: 24, od: 0.15995, rep: 'C' },
+          { t: 48, od: 0.18975, rep: 'A' }, { t: 48, od: 0.1386, rep: 'B' }, { t: 48, od: 0.1817, rep: 'C' },
+          { t: 72, od: 0.1796, rep: 'A' }, { t: 72, od: 0.1293, rep: 'B' }, { t: 72, od: 0.17085, rep: 'C' },
+          { t: 96, od: 0.2381, rep: 'A' }, { t: 96, od: 0.1645, rep: 'B' }, { t: 96, od: 0.23215, rep: 'C' },
+          { t: 123, od: 0.25545, rep: 'A' }, { t: 123, od: 0.23535, rep: 'B' }, { t: 123, od: 0.272, rep: 'C' }
         ]);
         
         const [showPaste, setShowPaste] = useState(false);
         const [pasteText, setPasteText] = useState('');
+        const svgRef = useRef(null);
 
-        const addPoint = () => setPoints([...points, { t: points.length > 0 ? points[points.length-1].t + 1 : 0, od: 0 }]);
-        
+        // Calculate Mean and STD
+        const processedData = useMemo(() => {
+          const grouped = {};
+          rawData.forEach(d => {
+            if (!grouped[d.t]) grouped[d.t] = [];
+            grouped[d.t].push(d.od);
+          });
+
+          const stats = Object.keys(grouped).map(t => {
+            const time = parseFloat(t);
+            const values = grouped[t];
+            const mean = values.reduce((a, b) => a + b, 0) / values.length;
+            const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (values.length > 1 ? values.length - 1 : 1);
+            const std = values.length > 1 ? Math.sqrt(variance) : 0;
+            return { t: time, mean, std, n: values.length };
+          });
+
+          return stats.sort((a, b) => a.t - b.t);
+        }, [rawData]);
+
+        // Helpers for inputs
         const removePoint = (idx) => {
-          const newP = [...points];
-          newP.splice(idx, 1);
-          setPoints(newP);
+          const newD = [...rawData];
+          newD.splice(idx, 1);
+          setRawData(newD);
         };
-
-        const updatePoint = (idx, field, value) => {
-          const newP = [...points];
-          newP[idx][field] = parseFloat(value);
-          setPoints(newP);
+        const updatePoint = (idx, field, val) => {
+          const newD = [...rawData];
+          newD[idx][field] = field === 'rep' ? val : parseFloat(val);
+          setRawData(newD);
         };
+        const addPoint = () => setRawData([...rawData, { t: processedData.length > 0 ? processedData[processedData.length-1].t + 24 : 0, od: 0, rep: 'A' }]);
 
         const handleBulkImport = () => {
           const lines = pasteText.split(/\r?\n/);
           const newPoints = [];
           lines.forEach(line => {
+            // Supports: "Time OD" or "Time OD Rep" or "Time \t OD"
             const parts = line.trim().split(/[\s,\t]+/);
             if (parts.length >= 2) {
               const t = parseFloat(parts[0]);
               const od = parseFloat(parts[1]);
+              const rep = parts[2] || 'A';
               if (!isNaN(t) && !isNaN(od)) {
-                newPoints.push({ t, od });
+                newPoints.push({ t, od, rep });
               }
             }
           });
           if (newPoints.length > 0) {
-            setPoints(newPoints);
+            setRawData(newPoints);
             setShowPaste(false);
           }
         };
 
-        // Graph Calculations
-        const sorted = [...points].sort((a,b) => a.t - b.t);
-        const maxT = Math.max(...sorted.map(p => p.t), 1);
-        const maxOD = Math.max(...sorted.map(p => p.od), 1);
+        const downloadGraph = () => {
+          if (!svgRef.current) return;
+          const svgData = new XMLSerializer().serializeToString(svgRef.current);
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          const img = new Image();
+          
+          // Get original dimensions
+          const svgRect = svgRef.current.getBoundingClientRect();
+          canvas.width = 1200; // High res
+          canvas.height = 800;
+
+          img.onload = () => {
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const png = canvas.toDataURL("image/png");
+            const a = document.createElement("a");
+            a.href = png;
+            a.download = "growth_curve.png";
+            a.click();
+          };
+          img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+        };
+
+        // Graph Config (Seaborn-like)
+        const width = 800;
+        const height = 500;
+        const pad = 60;
+        const color = "#0d3b66";
         
-        // Dimensions
-        const width = 600;
-        const height = 300;
-        const pad = 40;
-        
-        // Scale functions
+        const maxT = Math.max(...processedData.map(p => p.t), 1) * 1.1; // 10% padding
+        const maxOD = Math.max(...processedData.map(p => p.mean + p.std), 0.5) * 1.1;
+
         const scaleX = (t) => pad + (t / maxT) * (width - 2 * pad);
         const scaleY = (od) => (height - pad) - (od / maxOD) * (height - 2 * pad);
 
-        // Path generation
         let pathD = "";
-        sorted.forEach((p, i) => {
-          const x = scaleX(p.t);
-          const y = scaleY(p.od);
-          pathD += i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
+        processedData.forEach((p, i) => {
+           const x = scaleX(p.t);
+           const y = scaleY(p.mean);
+           pathD += i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
         });
 
         return (
-          <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             {/* Input Section */}
             <div className="lg:col-span-1 space-y-4">
@@ -417,15 +462,16 @@
                     className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-100 flex items-center gap-1"
                   >
                     <Clipboard className="w-3 h-3" />
-                    {showPaste ? 'Manual' : 'Paste'}
+                    {showPaste ? 'Manual' : 'Bulk Paste'}
                   </button>
                 </div>
 
                 {showPaste ? (
                   <div className="animate-fade-in">
+                    <p className="text-xs text-slate-500 mb-2">Paste columns: Time, OD, [Rep]. Supports Excel/CSV.</p>
                     <textarea
                       className="w-full h-64 p-3 text-xs font-mono border border-slate-200 rounded-lg bg-slate-50 mb-3 focus:ring-2 focus:ring-indigo-500 outline-none"
-                      placeholder={`Paste Excel/CSV data here:\nTime   OD\n0      0.05\n1      0.15\n...`}
+                      placeholder={`0\t0.096\tA\n0\t0.097\tB\n24\t0.153\tA...`}
                       value={pasteText}
                       onChange={e => setPasteText(e.target.value)}
                     ></textarea>
@@ -437,25 +483,32 @@
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-                     <div className="grid grid-cols-5 gap-2 text-xs font-bold text-slate-400 uppercase mb-2">
-                       <div className="col-span-2">Time (h)</div>
-                       <div className="col-span-2">OD 600</div>
+                  <div className="space-y-1 max-h-[60vh] overflow-y-auto pr-1">
+                     <div className="grid grid-cols-6 gap-2 text-xs font-bold text-slate-400 uppercase mb-2">
+                       <div className="col-span-2">Time</div>
+                       <div className="col-span-2">OD</div>
+                       <div className="col-span-1">Rep</div>
                        <div className="col-span-1"></div>
                      </div>
-                     {points.map((p, i) => (
-                       <div key={i} className="grid grid-cols-5 gap-2 items-center">
+                     {rawData.map((p, i) => (
+                       <div key={i} className="grid grid-cols-6 gap-2 items-center">
                          <input 
-                           type="number" step="0.5"
+                           type="number" 
                            value={p.t} 
                            onChange={e => updatePoint(i, 't', e.target.value)}
-                           className="col-span-2 p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 ring-indigo-500 outline-none transition-all"
+                           className="col-span-2 p-1.5 border border-slate-200 rounded text-sm bg-slate-50 focus:bg-white focus:ring-1 ring-indigo-500 outline-none"
                          />
                          <input 
                            type="number" step="0.01"
                            value={p.od} 
                            onChange={e => updatePoint(i, 'od', e.target.value)}
-                           className="col-span-2 p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 ring-indigo-500 outline-none transition-all"
+                           className="col-span-2 p-1.5 border border-slate-200 rounded text-sm bg-slate-50 focus:bg-white focus:ring-1 ring-indigo-500 outline-none"
+                         />
+                          <input 
+                           type="text"
+                           value={p.rep} 
+                           onChange={e => updatePoint(i, 'rep', e.target.value)}
+                           className="col-span-1 p-1.5 border border-slate-200 rounded text-sm bg-slate-50 focus:bg-white focus:ring-1 ring-indigo-500 outline-none text-center"
                          />
                          <button onClick={() => removePoint(i)} className="col-span-1 flex justify-center text-slate-300 hover:text-red-500">
                            <Trash className="w-4 h-4" />
@@ -464,9 +517,9 @@
                      ))}
                      <button 
                        onClick={addPoint}
-                       className="w-full py-2 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 hover:border-indigo-300 hover:text-indigo-500 flex justify-center items-center gap-2 mt-4 transition-colors"
+                       className="w-full py-2 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 hover:border-indigo-300 hover:text-indigo-500 flex justify-center items-center gap-2 mt-4 transition-colors text-sm"
                      >
-                       <Plus className="w-4 h-4" /> Add Time Point
+                       <Plus className="w-4 h-4" /> Add Data Point
                      </button>
                   </div>
                 )}
@@ -475,77 +528,118 @@
 
             {/* Graph Section */}
             <div className="lg:col-span-2">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-full">
-                 <h2 className="font-bold text-xl text-slate-800 mb-6">Growth Curve Analysis</h2>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+                 <div className="flex justify-between items-center mb-6">
+                    <h2 className="font-bold text-xl text-slate-800">Growth Curve Analysis</h2>
+                    <button 
+                      onClick={downloadGraph}
+                      className="text-sm bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-700 flex items-center gap-2 font-medium"
+                    >
+                      <Download className="w-4 h-4" /> Download PNG
+                    </button>
+                 </div>
                  
-                 {points.length < 2 ? (
-                   <div className="h-64 flex flex-col items-center justify-center text-slate-300 border-2 border-dashed border-slate-100 rounded-xl">
-                      <Activity className="w-12 h-12 mb-2" />
-                      <p>Add at least 2 points to generate graph</p>
-                   </div>
-                 ) : (
-                   <div className="w-full aspect-[2/1] relative">
-                     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
-                       {/* Grid Lines Y */}
-                       {[0, 0.25, 0.5, 0.75, 1].map(tick => {
-                         const y = scaleY(tick * maxOD);
+                 <div className="w-full bg-white border border-slate-100 rounded-xl p-4 overflow-hidden relative flex-grow flex items-center justify-center">
+                   {/* SVG Container */}
+                   <svg 
+                      ref={svgRef}
+                      viewBox={`0 0 ${width} ${height}`} 
+                      className="w-full h-auto max-h-[500px]"
+                      style={{fontFamily: 'Inter, sans-serif', backgroundColor: 'white'}}
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      {/* Background */}
+                      <rect width={width} height={height} fill="white" />
+
+                      {/* Title */}
+                      <text x={width/2} y={30} textAnchor="middle" fontSize="22" fontWeight="bold" fill="#333">Mean Growth Curve</text>
+                      
+                      {/* X Axis Label */}
+                      <text x={width/2} y={height-5} textAnchor="middle" fontSize="18" fontWeight="bold" fill="#333">Time (hours)</text>
+                      
+                      {/* Y Axis Label - Rotated */}
+                      <text x={15} y={height/2} textAnchor="middle" transform={`rotate(-90, 15, ${height/2})`} fontSize="18" fontWeight="bold" fill="#333">Mean Absorbance (OD)</text>
+
+                      {/* Axes Lines */}
+                      <line x1={pad} y1={height-pad} x2={width-pad} y2={height-pad} stroke="black" strokeWidth="2" />
+                      <line x1={pad} y1={pad} x2={pad} y2={height-pad} stroke="black" strokeWidth="2" />
+
+                      {/* Ticks X */}
+                      {[0, 0.25, 0.5, 0.75, 1].map(f => {
+                         const val = maxT * f;
+                         const x = scaleX(val);
+                         if(x > width-pad) return null;
                          return (
-                           <g key={tick}>
-                             <line x1={pad} y1={y} x2={width-pad} y2={y} stroke="#f1f5f9" strokeWidth="1" />
-                             <text x={pad-10} y={y+4} textAnchor="end" className="text-[10px] fill-slate-400 font-mono">
-                               {(tick * maxOD).toFixed(2)}
-                             </text>
+                           <g key={'tx'+f}>
+                             <line x1={x} y1={height-pad} x2={x} y2={height-pad+5} stroke="black" strokeWidth="1.5" />
+                             <text x={x} y={height-pad+20} textAnchor="middle" fontSize="12" fill="#333">{val.toFixed(0)}</text>
                            </g>
                          )
-                       })}
-                       
-                       {/* Grid Lines X */}
-                       {[0, 0.25, 0.5, 0.75, 1].map(tick => {
-                         const x = scaleX(tick * maxT);
+                      })}
+
+                      {/* Ticks Y */}
+                      {[0, 0.25, 0.5, 0.75, 1].map(f => {
+                         const val = maxOD * f;
+                         const y = scaleY(val);
+                         if(y < pad) return null;
                          return (
-                           <g key={tick}>
-                             <line x1={x} y1={pad} x2={x} y2={height-pad} stroke="#f1f5f9" strokeWidth="1" />
-                             <text x={x} y={height-pad+15} textAnchor="middle" className="text-[10px] fill-slate-400 font-mono">
-                               {(tick * maxT).toFixed(1)}h
-                             </text>
+                           <g key={'ty'+f}>
+                             <line x1={pad-5} y1={y} x2={pad} y2={y} stroke="black" strokeWidth="1.5" />
+                             <text x={pad-8} y={y+4} textAnchor="end" fontSize="12" fill="#333">{val.toFixed(2)}</text>
                            </g>
                          )
-                       })}
+                      })}
 
-                       {/* Axes */}
-                       <line x1={pad} y1={height-pad} x2={width-pad} y2={height-pad} stroke="#cbd5e1" strokeWidth="2" />
-                       <line x1={pad} y1={pad} x2={pad} y2={height-pad} stroke="#cbd5e1" strokeWidth="2" />
+                      {/* Data Group */}
+                      <g>
+                         {/* Connecting Line */}
+                         <path d={pathD} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                         
+                         {/* Points & Error Bars */}
+                         {processedData.map((p, i) => {
+                           const x = scaleX(p.t);
+                           const y = scaleY(p.mean);
+                           const yTop = scaleY(p.mean + p.std);
+                           const yBot = scaleY(p.mean - p.std);
 
-                       {/* The Line */}
-                       <path d={pathD} fill="none" stroke="#4f46e5" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                           return (
+                             <g key={i}>
+                               {/* Error Bar Vertical */}
+                               {p.std > 0 && (
+                                 <>
+                                  <line x1={x} y1={yBot} x2={x} y2={yTop} stroke="black" strokeWidth="1.5" />
+                                  {/* Caps */}
+                                  <line x1={x-5} y1={yBot} x2={x+5} y2={yBot} stroke="black" strokeWidth="1.5" />
+                                  <line x1={x-5} y1={yTop} x2={x+5} y2={yTop} stroke="black" strokeWidth="1.5" />
+                                 </>
+                               )}
+                               {/* Point */}
+                               <circle 
+                                 cx={x} cy={y} r="5" 
+                                 fill={color} 
+                                 stroke="black" strokeWidth="1.5"
+                               />
+                             </g>
+                           );
+                         })}
+                      </g>
+                   </svg>
+                 </div>
 
-                       {/* Data Dots */}
-                       {sorted.map((p, i) => (
-                         <circle 
-                           key={i} 
-                           cx={scaleX(p.t)} 
-                           cy={scaleY(p.od)} 
-                           r="4" 
-                           className="fill-white stroke-indigo-600 stroke-[3px] hover:r-6 transition-all cursor-pointer"
-                         >
-                           <title>Time: {p.t}h, OD: {p.od}</title>
-                         </circle>
-                       ))}
-                     </svg>
-                   </div>
-                 )}
-
-                 <div className="mt-6 p-4 bg-indigo-50 rounded-xl flex items-start gap-3">
-                   <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
-                     <Flask className="w-5 h-5" />
-                   </div>
-                   <div>
-                     <h4 className="font-bold text-indigo-900 text-sm">Growth Analysis</h4>
-                     <p className="text-xs text-indigo-700 mt-1">
-                       Peak OD reached is <span className="font-bold">{maxOD}</span> at {sorted.find(p=>p.od===maxOD)?.t} hours. 
-                       Log phase appears roughly between {maxT * 0.2}h and {maxT * 0.6}h.
-                     </p>
-                   </div>
+                 {/* Stats Summary */}
+                 <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                   {processedData.slice(0,4).map(d => (
+                     <div key={d.t} className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-center">
+                       <div className="text-xs font-bold text-slate-400">T = {d.t}h</div>
+                       <div className="font-mono text-indigo-700 font-bold">{d.mean.toFixed(3)}</div>
+                       <div className="text-[10px] text-slate-500">± {d.std.toFixed(3)}</div>
+                     </div>
+                   ))}
+                   {processedData.length > 4 && (
+                     <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex items-center justify-center text-xs text-slate-400">
+                       + {processedData.length - 4} more
+                     </div>
+                   )}
                  </div>
               </div>
             </div>
