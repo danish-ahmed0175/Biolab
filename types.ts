@@ -1,1 +1,1 @@
-// Types are implicit in the no-build global version
+// File deleted. Logic moved to index.html for static hosting compatibility.

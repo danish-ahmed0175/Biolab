@@ -1,1 +1,1 @@
-// This component is not used in the current version.
+// File deleted. Logic moved to index.html for static hosting compatibility.

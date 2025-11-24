@@ -1,1 +1,1 @@
-// Logic moved to index.html for static deployment stability
+// File deleted. Logic moved to index.html for static hosting compatibility.
