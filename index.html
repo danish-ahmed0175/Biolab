@@ -67,6 +67,7 @@
       const Clipboard = (p) => <Icon {...p}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></Icon>;
       const Download = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Icon>;
       const Settings = (p) => <Icon {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></Icon>;
+      const FileText = (p) => <Icon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></Icon>;
 
       // ==========================================
       // 2. SERVICES
@@ -357,8 +358,11 @@
           { t: 123, od: 0.25545, rep: 'A' }, { t: 123, od: 0.23535, rep: 'B' }, { t: 123, od: 0.272, rep: 'C' }
         ]);
         
-        const [showPaste, setShowPaste] = useState(false);
-        const [pasteText, setPasteText] = useState('');
+        // Import Logic States
+        const [importMode, setImportMode] = useState('simple'); // 'simple' | 'plate'
+        const [simplePaste, setSimplePaste] = useState('');
+        const [plateData, setPlateData] = useState('');
+        const [plateTime, setPlateTime] = useState('');
         const svgRef = useRef(null);
 
         // Process Data
@@ -394,8 +398,11 @@
         };
         const addPoint = () => setRawData([...rawData, { t: processedData.length > 0 ? processedData[processedData.length-1].t + 24 : 0, od: 0, rep: 'A' }]);
 
-        const handleBulkImport = () => {
-          const lines = pasteText.split(/\r?\n/);
+        // ----------------------------------------------------
+        // Logic: Simple Import
+        // ----------------------------------------------------
+        const handleSimpleImport = () => {
+          const lines = simplePaste.split(/\r?\n/);
           const newPoints = [];
           lines.forEach(line => {
             const parts = line.trim().split(/[\s,\t]+/);
@@ -407,10 +414,97 @@
             }
           });
           if (newPoints.length > 0) {
-            setRawData(newPoints);
-            setShowPaste(false);
+            setRawData([...rawData, ...newPoints]);
+            setSimplePaste('');
           }
         };
+
+        // ----------------------------------------------------
+        // Logic: Plate Reader Advanced Import
+        // ----------------------------------------------------
+        const handlePlateReaderImport = () => {
+          const t = parseFloat(plateTime);
+          if (isNaN(t)) {
+            alert("Please enter a valid Time Point (numbers only).");
+            return;
+          }
+
+          const lines = plateData.trim().split(/\r?\n/);
+          if (lines.length < 2) return;
+
+          // 1. Detect Headers
+          // We look for 'SampleID' (usually last) and 'Mean'
+          const headerLine = lines[0].split(/[\t,]/);
+          const meanIdx = headerLine.findIndex(h => h.trim().toLowerCase() === 'mean');
+          
+          // SampleID might be the last column if not explicitly named 'SampleID'
+          let sampleIdx = headerLine.findIndex(h => h.trim().toLowerCase() === 'sampleid');
+          if (sampleIdx === -1) sampleIdx = headerLine.length - 1;
+
+          if (meanIdx === -1) {
+            alert("Could not find 'Mean' column in CSV.");
+            return;
+          }
+
+          // 2. Parse Rows
+          const rows = [];
+          for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(/[\t,]/);
+            if (cols.length <= Math.max(meanIdx, sampleIdx)) continue;
+            
+            const meanVal = parseFloat(cols[meanIdx]);
+            const sId = cols[sampleIdx].trim();
+
+            if (!isNaN(meanVal) && sId) {
+              rows.push({ mean: meanVal, sampleId: sId });
+            }
+          }
+
+          // 3. Calculate Blank
+          const blanks = rows.filter(r => r.sampleId.toLowerCase() === 'blank');
+          let blankMean = 0;
+          if (blanks.length > 0) {
+            const sum = blanks.reduce((acc, curr) => acc + curr.mean, 0);
+            blankMean = sum / blanks.length;
+            console.log(`[T=${t}] Blank Mean: ${blankMean.toFixed(4)}`);
+          } else {
+            console.warn(`[T=${t}] No blanks found. Using 0.`);
+          }
+
+          // 4. Process Samples (Subtract Blank & Average Technical Replicates)
+          const samplesOnly = rows.filter(r => r.sampleId.toLowerCase() !== 'blank');
+          
+          // Group by SampleID (e.g. 'A', 'B', 'C')
+          const grouped = {};
+          samplesOnly.forEach(row => {
+            if (!grouped[row.sampleId]) grouped[row.sampleId] = [];
+            grouped[row.sampleId].push(row.mean);
+          });
+
+          const newPoints = [];
+          Object.keys(grouped).forEach(sId => {
+            const rawMeans = grouped[sId];
+            // Average technical replicates first (e.g., Well A1, A2 -> Sample A)
+            const avgRawMean = rawMeans.reduce((a,b)=>a+b,0) / rawMeans.length;
+            const correctedMean = avgRawMean - blankMean;
+            
+            // Add to main dataset
+            newPoints.push({
+              t: t,
+              od: correctedMean,
+              rep: sId
+            });
+          });
+
+          if (newPoints.length > 0) {
+             setRawData([...rawData, ...newPoints]);
+             setPlateData('');
+             alert(`Added ${newPoints.length} points for Time ${t}h.`);
+          } else {
+             alert("No valid sample data found.");
+          }
+        };
+
 
         const downloadGraph = () => {
           if (!svgRef.current) return;
@@ -418,7 +512,6 @@
           const canvas = document.createElement("canvas");
           const ctx = canvas.getContext("2d");
           const img = new Image();
-          const svgRect = svgRef.current.getBoundingClientRect();
           canvas.width = 1200;
           canvas.height = 800;
           img.onload = () => {
@@ -489,44 +582,85 @@
                 {/* Data Tab */}
                 {activeTab === 'data' && (
                   <div className="p-4 flex-1 overflow-hidden flex flex-col">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="font-bold text-slate-800 text-sm">Measurements</h3>
-                      <button onClick={() => setShowPaste(!showPaste)} className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-100 flex items-center gap-1">
-                        <Clipboard className="w-3 h-3" /> {showPaste ? 'Table' : 'Bulk Paste'}
-                      </button>
+                    
+                    {/* Import Mode Switcher */}
+                    <div className="flex bg-slate-100 rounded-lg p-1 mb-4">
+                       <button 
+                         onClick={() => setImportMode('simple')} 
+                         className={`flex-1 py-1 text-xs font-bold rounded-md transition-all ${importMode==='simple' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`}
+                       >
+                         Simple Table
+                       </button>
+                       <button 
+                         onClick={() => setImportMode('plate')} 
+                         className={`flex-1 py-1 text-xs font-bold rounded-md transition-all ${importMode==='plate' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`}
+                       >
+                         Plate Reader Import
+                       </button>
                     </div>
 
-                    {showPaste ? (
-                      <div className="flex-1 flex flex-col animate-fade-in">
-                        <p className="text-xs text-slate-500 mb-2">Paste columns: Time, OD, [Rep]. Excel/CSV.</p>
+                    {/* Simple Import UI */}
+                    {importMode === 'simple' && (
+                      <div className="mb-4">
                         <textarea
-                          className="flex-1 w-full p-3 text-xs font-mono border border-slate-200 rounded-lg bg-slate-50 mb-3 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
-                          placeholder={`0\t0.096\tA\n0\t0.097\tB...`}
-                          value={pasteText}
-                          onChange={e => setPasteText(e.target.value)}
+                          className="w-full p-2 text-xs font-mono border border-slate-200 rounded-lg bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none resize-none h-24 text-slate-800"
+                          placeholder={`Time  OD  Rep\n0     0.1  A\n0     0.2  B`}
+                          value={simplePaste}
+                          onChange={e => setSimplePaste(e.target.value)}
                         ></textarea>
-                        <button onClick={handleBulkImport} className="w-full bg-indigo-600 text-white py-2 rounded-lg font-medium hover:bg-indigo-700">Parse Data</button>
+                        <button onClick={handleSimpleImport} disabled={!simplePaste} className="mt-2 w-full bg-slate-800 text-white text-xs py-2 rounded-lg font-medium hover:bg-slate-700 disabled:opacity-50">
+                          Add Points
+                        </button>
                       </div>
-                    ) : (
-                      <div className="flex-1 overflow-y-auto pr-1">
+                    )}
+
+                    {/* Plate Reader Import UI */}
+                    {importMode === 'plate' && (
+                      <div className="mb-4 p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                        <div className="flex items-center gap-2 mb-2">
+                          <label className="text-xs font-bold text-indigo-800">Time Point (h):</label>
+                          <input 
+                            type="number" 
+                            value={plateTime} 
+                            onChange={e => setPlateTime(e.target.value)}
+                            className="w-16 p-1 text-xs border border-indigo-200 rounded text-center outline-none focus:border-indigo-500 text-slate-800"
+                            placeholder="0"
+                          />
+                        </div>
+                        <textarea
+                          className="w-full p-2 text-[10px] font-mono border border-indigo-200 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none h-24 mb-2 text-black"
+                          placeholder={`Well,Mean,StDev,SampleID\nA1,0.05,0.001,Blank\nA2,0.3,0.01,A...`}
+                          value={plateData}
+                          onChange={e => setPlateData(e.target.value)}
+                        ></textarea>
+                        <button onClick={handlePlateReaderImport} disabled={!plateData || !plateTime} className="w-full bg-indigo-600 text-white text-xs py-2 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 shadow-sm">
+                           Process & Add to Graph
+                        </button>
+                        <p className="text-[10px] text-indigo-400 mt-2 leading-tight">
+                          Auto-subtracts 'Blank'. Averages technical replicates.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Data List */}
+                    <div className="flex-1 overflow-y-auto pr-1 border-t border-slate-100 pt-2">
                         <div className="grid grid-cols-6 gap-2 text-[10px] font-bold text-slate-400 uppercase mb-2">
                            <div className="col-span-2">Time (h)</div>
                            <div className="col-span-2">OD</div>
                            <div className="col-span-1">Rep</div>
                         </div>
                         {rawData.map((p, i) => (
-                          <div key={i} className="grid grid-cols-6 gap-2 items-center mb-1">
-                            <input type="number" value={p.t} onChange={e => updatePoint(i, 't', e.target.value)} className="col-span-2 p-1 border rounded text-xs" />
-                            <input type="number" step="0.01" value={p.od} onChange={e => updatePoint(i, 'od', e.target.value)} className="col-span-2 p-1 border rounded text-xs" />
-                             <input type="text" value={p.rep} onChange={e => updatePoint(i, 'rep', e.target.value)} className="col-span-1 p-1 border rounded text-xs text-center" />
-                            <button onClick={() => removePoint(i)} className="col-span-1 text-slate-300 hover:text-red-500 flex justify-center"><Trash className="w-3 h-3" /></button>
+                          <div key={i} className="grid grid-cols-6 gap-2 items-center mb-1 group">
+                            <input type="number" value={p.t} onChange={e => updatePoint(i, 't', e.target.value)} className="col-span-2 p-1 border rounded text-xs bg-slate-50 focus:bg-white transition-colors" />
+                            <input type="number" step="0.0001" value={p.od} onChange={e => updatePoint(i, 'od', e.target.value)} className="col-span-2 p-1 border rounded text-xs bg-slate-50 focus:bg-white transition-colors" />
+                             <input type="text" value={p.rep} onChange={e => updatePoint(i, 'rep', e.target.value)} className="col-span-1 p-1 border rounded text-xs text-center bg-slate-50 focus:bg-white transition-colors" />
+                            <button onClick={() => removePoint(i)} className="col-span-1 text-slate-300 hover:text-red-500 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Trash className="w-3 h-3" /></button>
                           </div>
                         ))}
                         <button onClick={addPoint} className="w-full py-2 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 hover:text-indigo-500 hover:border-indigo-300 flex justify-center items-center gap-2 mt-4 text-xs font-medium transition-colors">
-                          <Plus className="w-3 h-3" /> Add Point
+                          <Plus className="w-3 h-3" /> Add Row
                         </button>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 )}
 
