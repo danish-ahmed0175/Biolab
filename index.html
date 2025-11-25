@@ -61,6 +61,7 @@
       const Alert = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></Icon>;
       const Key = (p) => <Icon {...p}><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></Icon>;
       const ChevronRight = (p) => <Icon {...p}><polyline points="9 18 15 12 9 6"/></Icon>;
+      const ChevronLeft = (p) => <Icon {...p}><polyline points="15 18 9 12 15 6"/></Icon>;
       const Activity = (p) => <Icon {...p}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></Icon>;
       const Plus = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
       const Trash = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></Icon>;
@@ -68,6 +69,7 @@
       const Download = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Icon>;
       const Settings = (p) => <Icon {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></Icon>;
       const FileText = (p) => <Icon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></Icon>;
+      const Calculator = (p) => <Icon {...p}><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="16" y1="18" x2="16" y2="18"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="12" y1="18" x2="12" y2="18"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/></Icon>;
 
       // ==========================================
       // 2. SERVICES
@@ -97,14 +99,33 @@
           return JSON.parse(data.candidates[0].content.parts[0].text);
         },
 
+        // Step 1: Search for possible matches
+        async searchOrganisms(query) {
+          const prompt = `
+            Identify up to 5 distinct microorganisms (bacteria, fungi, archaea) that match the search term "${query}".
+            If the term is generic (e.g., "Yeast"), list common species (e.g., "Saccharomyces cerevisiae", "Schizosaccharomyces pombe").
+            
+            Return JSON Array:
+            [
+              { 
+                "name": "Scientific Name", 
+                "commonName": "Common Name (optional)", 
+                "type": "Bacterium/Fungus/Archaea",
+                "description": "Short 1-sentence description."
+              }
+            ]
+          `;
+          return this.fetch(prompt);
+        },
+
+        // Step 2: Get details for a specific organism
         async analyze(organism) {
           const prompt = `
             Act as a microbiologist. I need data for the organism: "${organism}".
             
-            1. MEDIA: Find the standard DSMZ or ATCC media recipe. 
-               - Name the specific medium (e.g. "LB Broth", "DSMZ Medium 1").
-               - List ingredients for 1 Liter.
-               - Provide the DSMZ catalog search term.
+            1. MEDIA: Provide 2 to 3 distinct, OFFICIAL DSMZ or ATCC standard growth media recipes for this organism.
+               - The recipes MUST be based on the Deutsche Sammlung von Mikroorganismen und Zellkulturen (DSMZ) standards.
+               - For EACH medium, provide: Name (e.g. DSMZ Medium 1), Reference (DSMZ Medium Number), Ingredients (for 1L), Instructions.
             
             2. GENOME: Find NCBI genome details.
                - Scientific Name (exact spelling).
@@ -113,13 +134,16 @@
 
             Return JSON:
             {
-              "media": {
-                "name": "string",
-                "reference": "string (e.g. DSMZ 1)",
-                "ingredients": [{"item": "string", "amount": number, "unit": "g/ml"}],
-                "instructions": ["string"],
-                "dsmzTerm": "string"
-              },
+              "mediaOptions": [
+                {
+                  "name": "string (e.g. LB Broth)",
+                  "type": "string (e.g. General Purpose)",
+                  "reference": "string (e.g. DSMZ 1)",
+                  "ingredients": [{"item": "string", "amount": number, "unit": "g/ml"}],
+                  "instructions": ["string"],
+                  "dsmzTerm": "string (The term to search on DSMZ website)"
+                }
+              ],
               "genome": {
                 "scientificName": "string",
                 "size": "string",
@@ -172,119 +196,236 @@
 
       // --- Feature: Organism Lab ---
       const OrganismLab = ({ onKeyError }) => {
+        const [step, setStep] = useState('search'); // 'search' | 'results' | 'details'
         const [query, setQuery] = useState('');
-        const [data, setData] = useState(null);
+        
+        // Search Results State
+        const [results, setResults] = useState([]);
+        
+        // Detail State
+        const [selectedOrganism, setSelectedOrganism] = useState(null); // The basic info from search
+        const [detailData, setDetailData] = useState(null); // The full fetched details
+        const [selectedMediaIdx, setSelectedMediaIdx] = useState(0);
+
         const [loading, setLoading] = useState(false);
         const [error, setError] = useState(null);
         const [liters, setLiters] = useState(1.0);
 
-        const search = async () => {
+        // Step 1: Perform Search
+        const handleSearch = async () => {
           if (!query.trim()) return;
           setLoading(true);
           setError(null);
-          setData(null);
+          setResults([]);
           try {
-            const res = await GeminiService.analyze(query);
-            setData(res);
+            const data = await GeminiService.searchOrganisms(query);
+            setResults(data);
+            setStep('results');
           } catch (e) {
-            if (e.message === "MISSING_KEY") {
-               onKeyError();
-            } else {
-               setError("Could not find organism data.");
-            }
+             if (e.message === "MISSING_KEY") onKeyError();
+             else setError("Search failed. Please try again.");
           } finally {
             setLoading(false);
           }
         };
 
+        // Step 2: Select Organism & Fetch Details
+        const handleSelectOrganism = async (org) => {
+          setSelectedOrganism(org);
+          setLoading(true);
+          setError(null);
+          setDetailData(null);
+          try {
+            const data = await GeminiService.analyze(org.name);
+            setDetailData(data);
+            setStep('details');
+            setSelectedMediaIdx(0);
+          } catch (e) {
+             setError("Could not retrieve details for this organism.");
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        const goBackToSearch = () => {
+          setStep('search');
+          setResults([]);
+          setQuery('');
+        };
+
+        const goBackToResults = () => {
+          setStep('results');
+          setDetailData(null);
+        };
+
         return (
           <div className="max-w-3xl mx-auto">
-            {/* Search Bar */}
-            <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 flex gap-2 mb-8 transition-shadow focus-within:shadow-md focus-within:ring-2 ring-indigo-100">
-              <input 
-                className="flex-grow p-3 pl-4 outline-none text-slate-800 placeholder-slate-400 bg-transparent"
-                placeholder="Enter organism (e.g., E. coli, Yeast)..."
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && search()}
-              />
-              <button 
-                onClick={search}
-                disabled={loading || !query}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl px-6 font-medium transition-colors flex items-center gap-2"
-              >
-                {loading ? <Loader className="animate-spin w-5 h-5" /> : 'Analyze'}
-              </button>
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-6 flex items-center gap-3 border border-red-100">
-                <Alert className="w-5 h-5" />
-                {error}
+            
+            {/* SEARCH STEP */}
+            {step === 'search' && (
+              <div className="flex flex-col items-center justify-center min-h-[50vh] animate-fade-in">
+                <div className="bg-indigo-50 p-4 rounded-full mb-6">
+                  <Flask className="w-8 h-8 text-indigo-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800 mb-2">Find Your Organism</h2>
+                <p className="text-slate-500 mb-8 text-center max-w-md">Search for bacteria, fungi, or archaea to find DSMZ standard growth media recipes and genome info.</p>
+                
+                <div className="w-full max-w-lg relative">
+                  <input 
+                    className="w-full p-4 pl-12 rounded-xl shadow-lg border border-slate-200 outline-none bg-white text-black placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 transition-all"
+                    placeholder="E.g., E. coli, Yeast, Bacillus..."
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                    autoFocus
+                  />
+                  <Search className="absolute left-4 top-4 text-slate-400 w-5 h-5" />
+                  <button 
+                    onClick={handleSearch}
+                    disabled={loading || !query}
+                    className="absolute right-2 top-2 bottom-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg px-6 font-medium transition-colors flex items-center justify-center min-w-[80px]"
+                  >
+                    {loading ? <Loader className="animate-spin w-5 h-5" /> : 'Search'}
+                  </button>
+                </div>
+                {error && <div className="mt-4 text-red-500 bg-red-50 px-4 py-2 rounded-lg text-sm font-medium">{error}</div>}
               </div>
             )}
 
-            {/* Results Display */}
-            {data && (
+            {/* RESULTS STEP */}
+            {step === 'results' && (
+              <div className="animate-fade-in">
+                <button onClick={goBackToSearch} className="text-slate-500 hover:text-slate-800 flex items-center gap-1 mb-6 text-sm font-medium">
+                  <ChevronLeft className="w-4 h-4" /> Back to Search
+                </button>
+                <h3 className="text-xl font-bold text-slate-800 mb-4">Results for "{query}"</h3>
+                
+                {loading ? (
+                   <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                      <Loader className="w-8 h-8 animate-spin mb-4 text-indigo-600" />
+                      <p>Analyzing Organism Details...</p>
+                   </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {results.map((org, i) => (
+                      <button 
+                        key={i} 
+                        onClick={() => handleSelectOrganism(org)}
+                        className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 text-left transition-all group flex justify-between items-center"
+                      >
+                        <div>
+                          <h4 className="font-bold text-base text-black group-hover:text-indigo-600">{org.name}</h4>
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 mt-1 mr-2">{org.type}</span>
+                          <span className="text-slate-500 text-xs">{org.description}</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 flex-shrink-0 ml-4" />
+                      </button>
+                    ))}
+                    {results.length === 0 && (
+                      <div className="text-center py-10 text-slate-500">No organisms found. Try a different term.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* DETAILS STEP */}
+            {step === 'details' && detailData && (
               <div className="space-y-6 animate-fade-in">
                 
+                {/* Header Back */}
+                <button onClick={goBackToResults} className="text-slate-500 hover:text-slate-800 flex items-center gap-1 text-sm font-medium">
+                  <ChevronLeft className="w-4 h-4" /> Back to Results
+                </button>
+
                 {/* Media Card */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                  <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                  <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                       <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
                         <Flask className="w-5 h-5 text-indigo-500" />
                         Growth Media
                       </h2>
                       <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider font-semibold">
-                        Ref: {data.media.reference}
+                        {detailData.mediaOptions.length} Recipes Available
                       </p>
                     </div>
-                    <a 
-                      href={`https://www.dsmz.de/search?tx_indexed_search%5Bsword%5D=${encodeURIComponent(data.media.dsmzTerm)}`}
-                      target="_blank"
-                      className="text-xs bg-white border border-slate-200 hover:border-indigo-300 text-indigo-600 px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1"
-                    >
-                      Verify on DSMZ <ExternalLink className="w-3 h-3" />
-                    </a>
+                    
+                    {/* Media Tabs */}
+                    <div className="flex bg-slate-100 p-1 rounded-lg overflow-x-auto max-w-full">
+                      {detailData.mediaOptions.map((media, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setSelectedMediaIdx(idx)}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all ${
+                            selectedMediaIdx === idx 
+                            ? 'bg-white text-indigo-600 shadow-sm' 
+                            : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          {media.type || `Option ${idx+1}`}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="p-6">
-                    <div className="flex justify-between items-end mb-6">
-                      <h3 className="font-semibold text-xl text-indigo-900">{data.media.name}</h3>
-                      <div className="text-right">
-                        <label className="text-xs font-bold text-slate-400 uppercase">Total Volume</label>
-                        <div className="text-2xl font-bold text-indigo-600">{liters} L</div>
-                      </div>
-                    </div>
+                    {/* Active Media Content */}
+                    {(() => {
+                      const activeMedia = detailData.mediaOptions[selectedMediaIdx];
+                      return (
+                        <>
+                           <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
+                            <div>
+                              <h3 className="font-semibold text-xl text-indigo-900">{activeMedia.name}</h3>
+                              <div className="flex items-center gap-2 mt-2">
+                                <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded border border-indigo-100">
+                                  Ref: {activeMedia.reference}
+                                </span>
+                                <a 
+                                  href={`https://www.dsmz.de/search?tx_indexed_search%5Bsword%5D=${encodeURIComponent(activeMedia.dsmzTerm || activeMedia.name)}`}
+                                  target="_blank"
+                                  className="text-xs bg-white border border-slate-200 hover:border-indigo-300 text-indigo-600 px-2 py-1 rounded transition-colors flex items-center gap-1"
+                                >
+                                  Verify DSMZ <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
+                            </div>
+                            <div className="text-right w-full md:w-auto">
+                              <label className="text-xs font-bold text-slate-400 uppercase">Total Volume</label>
+                              <div className="text-2xl font-bold text-indigo-600">{liters} L</div>
+                            </div>
+                          </div>
 
-                    <input 
-                      type="range" min="0.1" max="5.0" step="0.1"
-                      value={liters}
-                      onChange={e => setLiters(parseFloat(e.target.value))}
-                      className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600 mb-8"
-                    />
+                          <input 
+                            type="range" min="0.1" max="5.0" step="0.1"
+                            value={liters}
+                            onChange={e => setLiters(parseFloat(e.target.value))}
+                            className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600 mb-8"
+                          />
 
-                    <div className="space-y-3 mb-8">
-                      {data.media.ingredients.map((ing, i) => (
-                        <div key={i} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
-                          <span className="text-slate-700 font-medium">{ing.item}</span>
-                          <span className="font-mono text-slate-500 bg-slate-50 px-2 py-1 rounded">
-                            {(ing.amount * liters).toFixed(2)} {ing.unit}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                          <div className="space-y-3 mb-8">
+                            {activeMedia.ingredients.map((ing, i) => (
+                              <div key={i} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
+                                <span className="text-slate-700 font-medium">{ing.item}</span>
+                                <span className="font-mono text-slate-500 bg-slate-50 px-2 py-1 rounded">
+                                  {(ing.amount * liters).toFixed(2)} {ing.unit}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
 
-                    <div className="bg-slate-50 rounded-xl p-4">
-                      <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Preparation</h4>
-                      <ol className="list-decimal list-inside space-y-2 text-sm text-slate-600">
-                        {data.media.instructions.map((step, i) => (
-                          <li key={i}>{step}</li>
-                        ))}
-                      </ol>
-                    </div>
+                          <div className="bg-slate-50 rounded-xl p-4">
+                            <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Preparation</h4>
+                            <ol className="list-decimal list-inside space-y-2 text-sm text-slate-600">
+                              {activeMedia.instructions.map((step, i) => (
+                                <li key={i}>{step}</li>
+                              ))}
+                            </ol>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -301,16 +442,16 @@
                   </div>
                   <div className="p-6">
                     <h3 className="text-xl font-serif italic text-slate-800 mb-2">
-                      {data.genome.scientificName}
+                      {detailData.genome.scientificName}
                     </h3>
                     <p className="text-slate-600 text-sm leading-relaxed mb-6">
-                      {data.genome.summary}
+                      {detailData.genome.summary}
                     </p>
                     
                     <div className="grid grid-cols-2 gap-4 mb-6">
                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                         <div className="text-xs text-slate-400 uppercase font-bold mb-1">Genome Size</div>
-                        <div className="text-slate-800 font-medium">{data.genome.size}</div>
+                        <div className="text-slate-800 font-medium">{detailData.genome.size}</div>
                       </div>
                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                          <div className="text-xs text-slate-400 uppercase font-bold mb-1">Source</div>
@@ -319,11 +460,11 @@
                     </div>
 
                     <a 
-                      href={`https://www.ncbi.nlm.nih.gov/genome/?term=${encodeURIComponent(data.genome.scientificName)}`}
+                      href={`https://www.ncbi.nlm.nih.gov/search/all/?term=${encodeURIComponent(detailData.genome.scientificName)}`}
                       target="_blank"
                       className="block w-full text-center py-3 bg-white border border-slate-200 text-emerald-600 hover:border-emerald-500 hover:text-emerald-700 font-medium rounded-xl transition-all"
                     >
-                      View Full Genome on NCBI
+                      Search on NCBI (All Databases)
                     </a>
                   </div>
                 </div>
@@ -332,6 +473,193 @@
             )}
           </div>
         )
+      };
+
+      // --- Feature: Lab Calculators ---
+      const LabCalculators = () => {
+        const [tab, setTab] = useState('molarity'); // 'molarity' | 'dilution'
+
+        // Molarity State
+        const [molMW, setMolMW] = useState('');
+        const [molVol, setMolVol] = useState(1);
+        const [molVolUnit, setMolVolUnit] = useState('L');
+        const [molConc, setMolConc] = useState(1);
+        const [molConcUnit, setMolConcUnit] = useState('M');
+
+        // Dilution State (All 4 vars)
+        const [dC1, setDC1] = useState('');
+        const [dV1, setDV1] = useState('');
+        const [dC2, setDC2] = useState('');
+        const [dV2, setDV2] = useState('');
+
+        // Results
+        const massResult = useMemo(() => {
+          const mw = parseFloat(molMW);
+          const v = parseFloat(molVol);
+          const c = parseFloat(molConc);
+          if (!mw || !v || !c) return 0;
+          
+          let vInLiters = molVolUnit === 'mL' ? v / 1000 : v;
+          let cInMolar = molConcUnit === 'mM' ? c / 1000 : c;
+
+          return (mw * cInMolar * vInLiters).toFixed(4);
+        }, [molMW, molVol, molVolUnit, molConc, molConcUnit]);
+
+        // Smart Dilution Calc: Detect which 1 of 4 is missing
+        const dilutionResult = useMemo(() => {
+           const c1 = parseFloat(dC1);
+           const v1 = parseFloat(dV1);
+           const c2 = parseFloat(dC2);
+           const v2 = parseFloat(dV2);
+           
+           // Helper to check if inputs are valid numbers and not just empty strings
+           const isNum = (n, s) => s.trim() !== '' && !isNaN(n);
+
+           const hasC1 = isNum(c1, dC1);
+           const hasV1 = isNum(v1, dV1);
+           const hasC2 = isNum(c2, dC2);
+           const hasV2 = isNum(v2, dV2);
+
+           const count = [hasC1, hasV1, hasC2, hasV2].filter(Boolean).length;
+
+           // Only calculate if exactly 3 are present
+           if (count !== 3) return null;
+
+           if (!hasC1) return { target: 'C1', label: 'Stock Concentration', val: (c2 * v2) / v1 };
+           if (!hasV1) return { target: 'V1', label: 'Volume of Stock', val: (c2 * v2) / c1 };
+           if (!hasC2) return { target: 'C2', label: 'Final Concentration', val: (c1 * v1) / v2 };
+           if (!hasV2) return { target: 'V2', label: 'Final Volume', val: (c1 * v1) / c2 };
+           
+           return null;
+        }, [dC1, dV1, dC2, dV2]);
+
+        return (
+          <div className="max-w-2xl mx-auto space-y-6">
+            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <Calculator className="w-8 h-8 text-indigo-600" />
+              Lab Calculators
+            </h2>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+               <div className="flex border-b border-slate-100">
+                  <button 
+                    onClick={() => setTab('molarity')}
+                    className={`flex-1 py-4 text-sm font-bold transition-colors ${tab === 'molarity' ? 'text-indigo-600 bg-indigo-50 border-b-2 border-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}
+                  >
+                    Molarity Calculator
+                  </button>
+                  <button 
+                    onClick={() => setTab('dilution')}
+                    className={`flex-1 py-4 text-sm font-bold transition-colors ${tab === 'dilution' ? 'text-indigo-600 bg-indigo-50 border-b-2 border-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}
+                  >
+                    Dilution (C1V1 = C2V2)
+                  </button>
+               </div>
+               
+               <div className="p-6">
+                 {/* MOLARITY */}
+                 {tab === 'molarity' && (
+                    <div className="space-y-5">
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Molecular Weight (MW)</label>
+                        <div className="relative">
+                          <input type="number" value={molMW} onChange={e => setMolMW(e.target.value)} className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:border-indigo-500" placeholder="e.g. 58.44 (NaCl)" />
+                          <span className="absolute right-3 top-3 text-sm text-slate-400">g/mol</span>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                           <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Desired Conc</label>
+                           <div className="flex">
+                             <input type="number" value={molConc} onChange={e => setMolConc(e.target.value)} className="w-full p-3 border border-slate-200 rounded-l-lg outline-none focus:border-indigo-500" />
+                             <select value={molConcUnit} onChange={e => setMolConcUnit(e.target.value)} className="bg-slate-100 border border-l-0 border-slate-200 rounded-r-lg px-2 text-sm text-slate-700 outline-none">
+                               <option value="M">M</option>
+                               <option value="mM">mM</option>
+                             </select>
+                           </div>
+                        </div>
+                        <div>
+                           <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Final Volume</label>
+                           <div className="flex">
+                             <input type="number" value={molVol} onChange={e => setMolVol(e.target.value)} className="w-full p-3 border border-slate-200 rounded-l-lg outline-none focus:border-indigo-500" />
+                             <select value={molVolUnit} onChange={e => setMolVolUnit(e.target.value)} className="bg-slate-100 border border-l-0 border-slate-200 rounded-r-lg px-2 text-sm text-slate-700 outline-none">
+                               <option value="L">L</option>
+                               <option value="mL">mL</option>
+                             </select>
+                           </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-indigo-50 rounded-xl p-5 border border-indigo-100 text-center">
+                         <div className="text-sm text-indigo-800 font-medium mb-1">Mass Required</div>
+                         <div className="text-3xl font-bold text-indigo-600">{massResult} <span className="text-lg">g</span></div>
+                         <p className="text-xs text-indigo-400 mt-2">Dissolve this amount to reach final volume.</p>
+                      </div>
+                    </div>
+                 )}
+
+                 {/* DILUTION */}
+                 {tab === 'dilution' && (
+                    <div className="space-y-6">
+                       <p className="text-xs text-slate-400 text-center italic">Enter any 3 values to calculate the 4th.</p>
+                       <div className="grid grid-cols-2 gap-6 relative">
+                          {/* Stock Side */}
+                          <div className="space-y-4 p-4 rounded-xl bg-slate-50/50 border border-slate-100">
+                            <h4 className="text-sm font-bold text-indigo-600 border-b border-indigo-100 pb-2">Start (Stock)</h4>
+                            <div>
+                               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Conc (C1)</label>
+                               <input type="number" value={dC1} onChange={e => setDC1(e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg outline-none focus:border-indigo-500" placeholder="e.g. 100" />
+                            </div>
+                            <div>
+                               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Vol (V1)</label>
+                               <input type="number" value={dV1} onChange={e => setDV1(e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg outline-none focus:border-indigo-500" placeholder="e.g. ?" />
+                            </div>
+                          </div>
+                          
+                          {/* Target Side */}
+                          <div className="space-y-4 p-4 rounded-xl bg-slate-50/50 border border-slate-100">
+                            <h4 className="text-sm font-bold text-emerald-600 border-b border-emerald-100 pb-2">End (Target)</h4>
+                            <div>
+                               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Conc (C2)</label>
+                               <input type="number" value={dC2} onChange={e => setDC2(e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg outline-none focus:border-indigo-500" placeholder="e.g. 5" />
+                            </div>
+                            <div>
+                               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Vol (V2)</label>
+                               <input type="number" value={dV2} onChange={e => setDV2(e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg outline-none focus:border-indigo-500" placeholder="e.g. 50" />
+                            </div>
+                          </div>
+
+                          {/* Equals Sign */}
+                          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-2 shadow-sm border border-slate-200 text-slate-400">
+                            =
+                          </div>
+                       </div>
+                       
+                       {/* Result Box */}
+                       <div className={`rounded-xl p-5 border text-center transition-all ${dilutionResult ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
+                         {dilutionResult ? (
+                           <>
+                              <div className="text-sm text-emerald-800 font-medium mb-1">Calculated {dilutionResult.label} ({dilutionResult.target})</div>
+                              <div className="text-3xl font-bold text-emerald-600">
+                                {isFinite(dilutionResult.val) ? dilutionResult.val.toFixed(2) : 'Error'}
+                              </div>
+                              {dilutionResult.target === 'V1' && (
+                                <p className="text-xs text-emerald-500 mt-2">
+                                  Dilute <b>{dilutionResult.val.toFixed(2)}</b> of stock into <b>{(parseFloat(dV2) - dilutionResult.val).toFixed(2)}</b> solvent.
+                                </p>
+                              )}
+                           </>
+                         ) : (
+                           <div className="text-slate-400 text-sm py-2">Fill exactly 3 fields to see the result.</div>
+                         )}
+                      </div>
+                    </div>
+                 )}
+               </div>
+            </div>
+          </div>
+        );
       };
 
       // --- Feature: OD Graph (Updated) ---
@@ -864,7 +1192,7 @@
         const menuItems = [
           { id: 'organism-lab', label: 'Organism Lab', icon: Flask },
           { id: 'od-graph', label: 'OD Growth Curve', icon: Activity },
-          // Future features will be added here
+          { id: 'calculators', label: 'Lab Calculators', icon: Calculator },
         ];
 
         return (
@@ -946,6 +1274,7 @@
             <main className="flex-grow p-4 md:p-8">
               {view === 'organism-lab' && <OrganismLab onKeyError={() => setKey(null)} />}
               {view === 'od-graph' && <ODGraph />}
+              {view === 'calculators' && <LabCalculators />}
             </main>
 
           </div>
